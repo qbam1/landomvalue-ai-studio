@@ -17,6 +17,29 @@ type SavedAI = {
   mustNot: string;
 };
 
+type AISetting = {
+  botName: string;
+  role: string;
+  target: string;
+  tone: string;
+  mustDo: string;
+  mustNot: string;
+};
+
+function encodeAISetting(setting: AISetting) {
+  const json = JSON.stringify(setting);
+  return encodeURIComponent(btoa(unescape(encodeURIComponent(json))));
+}
+
+function decodeAISetting(value: string): AISetting | null {
+  try {
+    const json = decodeURIComponent(escape(atob(decodeURIComponent(value))));
+    return JSON.parse(json);
+  } catch {
+    return null;
+  }
+}
+
 export default function Home() {
   const [botName, setBotName] = useState("");
   const [role, setRole] = useState("");
@@ -28,12 +51,30 @@ export default function Home() {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [savedAIs, setSavedAIs] = useState<SavedAI[]>([]);
   const [showSavedAIs, setShowSavedAIs] = useState(false);
+  const [shareLink, setShareLink] = useState("");
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     const saved = localStorage.getItem("landomvalue-ai-list");
     if (saved) {
       setSavedAIs(JSON.parse(saved));
+    }
+
+    const params = new URLSearchParams(window.location.search);
+    const sharedAI = params.get("ai");
+
+    if (sharedAI) {
+      const decoded = decodeAISetting(sharedAI);
+
+      if (decoded) {
+        setBotName(decoded.botName);
+        setRole(decoded.role);
+        setTarget(decoded.target);
+        setTone(decoded.tone);
+        setMustDo(decoded.mustDo);
+        setMustNot(decoded.mustNot);
+        setMessages([]);
+      }
     }
   }, []);
 
@@ -70,11 +111,35 @@ export default function Home() {
     setMustDo(ai.mustDo);
     setMustNot(ai.mustNot);
     setMessages([]);
+    setShareLink("");
   }
 
   function deleteAI(id: string) {
     const nextList = savedAIs.filter((ai) => ai.id !== id);
     saveToLocalStorage(nextList);
+  }
+
+  async function createShareLink() {
+    const setting: AISetting = {
+      botName: botName || "이름 없는 AI",
+      role,
+      target,
+      tone,
+      mustDo,
+      mustNot,
+    };
+
+    const encoded = encodeAISetting(setting);
+    const url = `${window.location.origin}${window.location.pathname}?ai=${encoded}`;
+
+    setShareLink(url);
+
+    try {
+      await navigator.clipboard.writeText(url);
+      alert("공유 링크가 복사되었습니다.");
+    } catch {
+      alert("공유 링크가 생성되었습니다. 아래 링크를 직접 복사해주세요.");
+    }
   }
 
   async function handleRun() {
@@ -182,6 +247,20 @@ ${mustNot || "개인정보를 묻지 않는다."}
               >
                 이 AI 저장하기
               </button>
+
+              <button
+                onClick={createShareLink}
+                className="w-full rounded-2xl bg-blue-600 px-5 py-4 font-bold text-white"
+              >
+                공유 링크 만들기
+              </button>
+
+              {shareLink && (
+                <div className="rounded-2xl bg-gray-50 p-4 text-sm">
+                  <p className="font-bold">공유 링크</p>
+                  <p className="mt-2 break-all text-gray-600">{shareLink}</p>
+                </div>
+              )}
 
               <button
                 onClick={() => setShowSavedAIs(!showSavedAIs)}
