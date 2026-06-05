@@ -1,10 +1,20 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 type ChatMessage = {
   role: "user" | "ai";
   text: string;
+};
+
+type SavedAI = {
+  id: string;
+  botName: string;
+  role: string;
+  target: string;
+  tone: string;
+  mustDo: string;
+  mustNot: string;
 };
 
 export default function Home() {
@@ -16,7 +26,56 @@ export default function Home() {
   const [mustNot, setMustNot] = useState("");
   const [question, setQuestion] = useState("");
   const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [savedAIs, setSavedAIs] = useState<SavedAI[]>([]);
+  const [showSavedAIs, setShowSavedAIs] = useState(false);
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    const saved = localStorage.getItem("landomvalue-ai-list");
+    if (saved) {
+      setSavedAIs(JSON.parse(saved));
+    }
+  }, []);
+
+  function saveToLocalStorage(nextList: SavedAI[]) {
+    setSavedAIs(nextList);
+    localStorage.setItem("landomvalue-ai-list", JSON.stringify(nextList));
+  }
+
+  function saveAI() {
+    if (savedAIs.length >= 5) {
+      alert("저장한 AI는 최대 5개까지 가능합니다. 필요 없는 AI를 삭제한 뒤 다시 저장해주세요.");
+      return;
+    }
+
+    const newAI: SavedAI = {
+      id: crypto.randomUUID(),
+      botName: botName || "이름 없는 AI",
+      role,
+      target,
+      tone,
+      mustDo,
+      mustNot,
+    };
+
+    saveToLocalStorage([newAI, ...savedAIs]);
+    setShowSavedAIs(true);
+  }
+
+  function loadAI(ai: SavedAI) {
+    setBotName(ai.botName);
+    setRole(ai.role);
+    setTarget(ai.target);
+    setTone(ai.tone);
+    setMustDo(ai.mustDo);
+    setMustNot(ai.mustNot);
+    setMessages([]);
+  }
+
+  function deleteAI(id: string) {
+    const nextList = savedAIs.filter((ai) => ai.id !== id);
+    saveToLocalStorage(nextList);
+  }
 
   async function handleRun() {
     if (!question.trim() || loading) return;
@@ -97,10 +156,9 @@ ${mustNot || "개인정보를 묻지 않는다."}
 
   return (
     <main className="min-h-screen bg-gray-100 px-6 py-10 text-gray-900">
-      <div className="mx-auto max-w-5xl">
+      <div className="mx-auto max-w-6xl">
         <header className="mb-8 rounded-3xl bg-white p-8 shadow">
           <h1 className="text-3xl font-bold">엉뚱한가치 AI Studio</h1>
-
           <p className="mt-3 text-gray-600">
             나만의 AI를 설계하고 직접 대화해보는 AI 실험 플랫폼입니다.
           </p>
@@ -111,59 +169,78 @@ ${mustNot || "개인정보를 묻지 않는다."}
             <h2 className="text-2xl font-bold">1. 나만의 AI 만들기</h2>
 
             <div className="mt-6 space-y-5">
-              <Input
-                label="AI 이름"
-                value={botName}
-                setValue={setBotName}
-                placeholder="예: 갯벌박사봇, 급식추천봇, 공룡선생님"
-              />
+              <Input label="AI 이름" value={botName} setValue={setBotName} placeholder="예: 갯벌박사봇, 급식추천봇, 공룡선생님" />
+              <Input label="AI의 역할" value={role} setValue={setRole} placeholder="예: 너는 초등학생을 도와주는 환경 퀴즈 선생님이야." />
+              <Input label="사용 대상" value={target} setValue={setTarget} placeholder="예: 초등학교 5학년" />
+              <Input label="말투" value={tone} setValue={setTone} placeholder="예: 친절하고 재미있게, 어려운 말은 쉽게 풀어서" />
+              <TextArea label="반드시 해야 할 것" value={mustDo} setValue={setMustDo} placeholder="예: 답변 끝에 퀴즈 1개를 낸다." />
+              <TextArea label="하지 말아야 할 것" value={mustNot} setValue={setMustNot} placeholder="예: 개인정보를 묻지 않는다. 어려운 용어를 남발하지 않는다." />
 
-              <Input
-                label="AI의 역할"
-                value={role}
-                setValue={setRole}
-                placeholder="예: 너는 초등학생을 도와주는 환경 퀴즈 선생님이야."
-              />
+              <button
+                onClick={saveAI}
+                className="w-full rounded-2xl bg-black px-5 py-4 font-bold text-white"
+              >
+                이 AI 저장하기
+              </button>
 
-              <Input
-                label="사용 대상"
-                value={target}
-                setValue={setTarget}
-                placeholder="예: 초등학교 5학년"
-              />
-
-              <Input
-                label="말투"
-                value={tone}
-                setValue={setTone}
-                placeholder="예: 친절하고 재미있게, 어려운 말은 쉽게 풀어서"
-              />
-
-              <TextArea
-                label="반드시 해야 할 것"
-                value={mustDo}
-                setValue={setMustDo}
-                placeholder="예: 답변 끝에 퀴즈 1개를 낸다."
-              />
-
-              <TextArea
-                label="하지 말아야 할 것"
-                value={mustNot}
-                setValue={setMustNot}
-                placeholder="예: 개인정보를 묻지 않는다. 어려운 용어를 남발하지 않는다."
-              />
+              <button
+                onClick={() => setShowSavedAIs(!showSavedAIs)}
+                className="w-full rounded-2xl border px-5 py-4 font-bold"
+              >
+                {showSavedAIs ? "저장한 AI 숨기기" : `저장한 AI 보기 (${savedAIs.length}/5)`}
+              </button>
             </div>
+
+            {showSavedAIs && (
+              <div className="mt-8 rounded-2xl bg-gray-50 p-4">
+                <h3 className="font-bold">저장한 AI</h3>
+
+                {savedAIs.length === 0 ? (
+                  <p className="mt-3 text-sm text-gray-500">
+                    아직 저장한 AI가 없습니다.
+                  </p>
+                ) : (
+                  <div className="mt-4 space-y-3">
+                    {savedAIs.map((ai) => (
+                      <div
+                        key={ai.id}
+                        className="rounded-xl bg-white p-4 shadow-sm"
+                      >
+                        <p className="font-bold">{ai.botName}</p>
+                        <p className="mt-1 text-sm text-gray-500">
+                          {ai.role || "역할 없음"}
+                        </p>
+
+                        <div className="mt-3 flex gap-2">
+                          <button
+                            onClick={() => loadAI(ai)}
+                            className="rounded-lg bg-black px-3 py-2 text-sm font-bold text-white"
+                          >
+                            불러오기
+                          </button>
+
+                          <button
+                            onClick={() => deleteAI(ai.id)}
+                            className="rounded-lg border px-3 py-2 text-sm font-bold"
+                          >
+                            삭제
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
           </section>
 
           <section className="rounded-3xl bg-white p-6 shadow">
             <div className="flex items-center justify-between gap-3">
               <div>
                 <h2 className="text-2xl font-bold">2. AI 체험하기</h2>
-
                 <p className="mt-1 text-sm text-gray-500">
                   지침을 바꾸면 AI의 답변도 달라집니다.
                 </p>
-
                 <p className="mt-2 rounded-xl bg-gray-100 px-3 py-2 text-sm font-bold text-gray-700">
                   현재 AI: {botName || "이름 없는 AI"}
                 </p>
