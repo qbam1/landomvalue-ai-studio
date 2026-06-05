@@ -99,32 +99,73 @@ ${mustNot || "개인정보를 묻지 않는다."}
     <main className="min-h-screen bg-gray-100 px-6 py-10 text-gray-900">
       <div className="mx-auto max-w-5xl">
         <header className="mb-8 rounded-3xl bg-white p-8 shadow">
-          <h1 className="text-3xl font-bold">엉뚱한가치 GPT Maker</h1>
+          <h1 className="text-3xl font-bold">엉뚱한가치 AI Studio</h1>
+
           <p className="mt-3 text-gray-600">
-            로그인 없이 AI 지침을 설계하고, 내가 만든 AI와 직접 대화해보는 수업용 웹앱입니다.
+            나만의 AI를 설계하고 직접 대화해보는 AI 실험 플랫폼입니다.
           </p>
         </header>
 
         <div className="grid gap-6 lg:grid-cols-2">
           <section className="rounded-3xl bg-white p-6 shadow">
-            <h2 className="text-2xl font-bold">1. AI 지침 설계하기</h2>
+            <h2 className="text-2xl font-bold">1. 나만의 AI 만들기</h2>
 
             <div className="mt-6 space-y-5">
-              <Input label="AI 이름" value={botName} setValue={setBotName} placeholder="예: 갯벌박사봇, 급식추천봇, 공룡선생님" />
-              <Input label="AI의 역할" value={role} setValue={setRole} placeholder="예: 너는 초등학생을 도와주는 환경 퀴즈 선생님이야." />
-              <Input label="사용 대상" value={target} setValue={setTarget} placeholder="예: 초등학교 5학년" />
-              <Input label="말투" value={tone} setValue={setTone} placeholder="예: 친절하고 재미있게, 어려운 말은 쉽게 풀어서" />
-              <TextArea label="반드시 해야 할 것" value={mustDo} setValue={setMustDo} placeholder="예: 답변 끝에 퀴즈 1개를 낸다." />
-              <TextArea label="하지 말아야 할 것" value={mustNot} setValue={setMustNot} placeholder="예: 개인정보를 묻지 않는다. 어려운 용어를 남발하지 않는다." />
+              <Input
+                label="AI 이름"
+                value={botName}
+                setValue={setBotName}
+                placeholder="예: 갯벌박사봇, 급식추천봇, 공룡선생님"
+              />
+
+              <Input
+                label="AI의 역할"
+                value={role}
+                setValue={setRole}
+                placeholder="예: 너는 초등학생을 도와주는 환경 퀴즈 선생님이야."
+              />
+
+              <Input
+                label="사용 대상"
+                value={target}
+                setValue={setTarget}
+                placeholder="예: 초등학교 5학년"
+              />
+
+              <Input
+                label="말투"
+                value={tone}
+                setValue={setTone}
+                placeholder="예: 친절하고 재미있게, 어려운 말은 쉽게 풀어서"
+              />
+
+              <TextArea
+                label="반드시 해야 할 것"
+                value={mustDo}
+                setValue={setMustDo}
+                placeholder="예: 답변 끝에 퀴즈 1개를 낸다."
+              />
+
+              <TextArea
+                label="하지 말아야 할 것"
+                value={mustNot}
+                setValue={setMustNot}
+                placeholder="예: 개인정보를 묻지 않는다. 어려운 용어를 남발하지 않는다."
+              />
             </div>
           </section>
 
           <section className="rounded-3xl bg-white p-6 shadow">
             <div className="flex items-center justify-between gap-3">
               <div>
-                <h2 className="text-2xl font-bold">2. 내 AI와 대화하기</h2>
+                <h2 className="text-2xl font-bold">2. AI 체험하기</h2>
+
                 <p className="mt-1 text-sm text-gray-500">
                   지침을 바꾸면 AI의 답변도 달라집니다.
+                </p>
+
+                <p className="mt-2 rounded-xl bg-gray-100 px-3 py-2 text-sm font-bold text-gray-700">
+                  현재 AI: {botName || "이름 없는 AI"}
                 </p>
               </div>
 
