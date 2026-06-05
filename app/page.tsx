@@ -51,6 +51,7 @@ export default function Home() {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [savedAIs, setSavedAIs] = useState<SavedAI[]>([]);
   const [showSavedAIs, setShowSavedAIs] = useState(false);
+  const [showGallery, setShowGallery] = useState(false);
   const [shareLink, setShareLink] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -101,6 +102,7 @@ export default function Home() {
 
     saveToLocalStorage([newAI, ...savedAIs]);
     setShowSavedAIs(true);
+    setShowGallery(true);
   }
 
   function loadAI(ai: SavedAI) {
@@ -241,17 +243,11 @@ ${mustNot || "개인정보를 묻지 않는다."}
               <TextArea label="반드시 해야 할 것" value={mustDo} setValue={setMustDo} placeholder="예: 답변 끝에 퀴즈 1개를 낸다." />
               <TextArea label="하지 말아야 할 것" value={mustNot} setValue={setMustNot} placeholder="예: 개인정보를 묻지 않는다. 어려운 용어를 남발하지 않는다." />
 
-              <button
-                onClick={saveAI}
-                className="w-full rounded-2xl bg-black px-5 py-4 font-bold text-white"
-              >
+              <button onClick={saveAI} className="w-full rounded-2xl bg-black px-5 py-4 font-bold text-white">
                 이 AI 저장하기
               </button>
 
-              <button
-                onClick={createShareLink}
-                className="w-full rounded-2xl bg-blue-600 px-5 py-4 font-bold text-white"
-              >
+              <button onClick={createShareLink} className="w-full rounded-2xl bg-blue-600 px-5 py-4 font-bold text-white">
                 공유 링크 만들기
               </button>
 
@@ -262,11 +258,12 @@ ${mustNot || "개인정보를 묻지 않는다."}
                 </div>
               )}
 
-              <button
-                onClick={() => setShowSavedAIs(!showSavedAIs)}
-                className="w-full rounded-2xl border px-5 py-4 font-bold"
-              >
+              <button onClick={() => setShowSavedAIs(!showSavedAIs)} className="w-full rounded-2xl border px-5 py-4 font-bold">
                 {showSavedAIs ? "저장한 AI 숨기기" : `저장한 AI 보기 (${savedAIs.length}/5)`}
+              </button>
+
+              <button onClick={() => setShowGallery(!showGallery)} className="w-full rounded-2xl border px-5 py-4 font-bold">
+                {showGallery ? "AI 카드 갤러리 숨기기" : "AI 카드 갤러리 보기"}
               </button>
             </div>
 
@@ -275,37 +272,58 @@ ${mustNot || "개인정보를 묻지 않는다."}
                 <h3 className="font-bold">저장한 AI</h3>
 
                 {savedAIs.length === 0 ? (
-                  <p className="mt-3 text-sm text-gray-500">
-                    아직 저장한 AI가 없습니다.
-                  </p>
+                  <p className="mt-3 text-sm text-gray-500">아직 저장한 AI가 없습니다.</p>
                 ) : (
                   <div className="mt-4 space-y-3">
                     {savedAIs.map((ai) => (
-                      <div
-                        key={ai.id}
-                        className="rounded-xl bg-white p-4 shadow-sm"
-                      >
+                      <div key={ai.id} className="rounded-xl bg-white p-4 shadow-sm">
                         <p className="font-bold">{ai.botName}</p>
-                        <p className="mt-1 text-sm text-gray-500">
-                          {ai.role || "역할 없음"}
-                        </p>
+                        <p className="mt-1 text-sm text-gray-500">{ai.role || "역할 없음"}</p>
 
                         <div className="mt-3 flex gap-2">
-                          <button
-                            onClick={() => loadAI(ai)}
-                            className="rounded-lg bg-black px-3 py-2 text-sm font-bold text-white"
-                          >
+                          <button onClick={() => loadAI(ai)} className="rounded-lg bg-black px-3 py-2 text-sm font-bold text-white">
                             불러오기
                           </button>
 
-                          <button
-                            onClick={() => deleteAI(ai.id)}
-                            className="rounded-lg border px-3 py-2 text-sm font-bold"
-                          >
+                          <button onClick={() => deleteAI(ai.id)} className="rounded-lg border px-3 py-2 text-sm font-bold">
                             삭제
                           </button>
                         </div>
                       </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {showGallery && (
+              <div className="mt-8 rounded-2xl bg-gray-50 p-4">
+                <div className="flex items-center justify-between">
+                  <h3 className="font-bold">AI 카드 갤러리</h3>
+                  <span className="text-sm text-gray-500">{savedAIs.length}/5</span>
+                </div>
+
+                {savedAIs.length === 0 ? (
+                  <p className="mt-3 text-sm text-gray-500">
+                    아직 카드로 보여줄 AI가 없습니다. 먼저 AI를 저장해보세요.
+                  </p>
+                ) : (
+                  <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                    {savedAIs.map((ai) => (
+                      <button
+                        key={ai.id}
+                        onClick={() => loadAI(ai)}
+                        className="rounded-2xl bg-white p-4 text-left shadow-sm transition hover:scale-[1.02] hover:shadow"
+                      >
+                        <div className="text-3xl">🤖</div>
+                        <p className="mt-3 font-bold">{ai.botName}</p>
+                        <p className="mt-2 line-clamp-3 text-sm text-gray-500">
+                          {ai.role || "아직 역할 설명이 없습니다."}
+                        </p>
+                        <p className="mt-3 text-xs font-bold text-gray-400">
+                          클릭하면 불러오기
+                        </p>
+                      </button>
                     ))}
                   </div>
                 )}
@@ -317,27 +335,20 @@ ${mustNot || "개인정보를 묻지 않는다."}
             <div className="flex items-center justify-between gap-3">
               <div>
                 <h2 className="text-2xl font-bold">2. AI 체험하기</h2>
-                <p className="mt-1 text-sm text-gray-500">
-                  지침을 바꾸면 AI의 답변도 달라집니다.
-                </p>
+                <p className="mt-1 text-sm text-gray-500">지침을 바꾸면 AI의 답변도 달라집니다.</p>
                 <p className="mt-2 rounded-xl bg-gray-100 px-3 py-2 text-sm font-bold text-gray-700">
                   현재 AI: {botName || "이름 없는 AI"}
                 </p>
               </div>
 
-              <button
-                onClick={resetChat}
-                className="rounded-xl border px-4 py-2 text-sm font-bold"
-              >
+              <button onClick={resetChat} className="rounded-xl border px-4 py-2 text-sm font-bold">
                 대화 지우기
               </button>
             </div>
 
             <div className="mt-6 h-[520px] overflow-y-auto rounded-2xl bg-gray-50 p-4">
               {messages.length === 0 ? (
-                <p className="text-gray-500">
-                  아직 대화가 없습니다. 아래 질문을 입력해보세요.
-                </p>
+                <p className="text-gray-500">아직 대화가 없습니다. 아래 질문을 입력해보세요.</p>
               ) : (
                 <div className="space-y-4">
                   {messages.map((msg, index) => (
@@ -373,11 +384,7 @@ ${mustNot || "개인정보를 묻지 않는다."}
                 className="flex-1 rounded-xl border border-gray-300 px-4 py-3"
               />
 
-              <button
-                onClick={handleRun}
-                disabled={loading}
-                className="rounded-xl bg-black px-5 py-3 font-bold text-white disabled:bg-gray-400"
-              >
+              <button onClick={handleRun} disabled={loading} className="rounded-xl bg-black px-5 py-3 font-bold text-white disabled:bg-gray-400">
                 보내기
               </button>
             </div>
