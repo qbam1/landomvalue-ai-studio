@@ -54,6 +54,7 @@ export default function Home() {
   const [showGallery, setShowGallery] = useState(false);
   const [shareLink, setShareLink] = useState("");
   const [loading, setLoading] = useState(false);
+  const [cooldown, setCooldown] = useState(0);
 
   useEffect(() => {
     const saved = localStorage.getItem("landomvalue-ai-list");
@@ -145,7 +146,7 @@ export default function Home() {
   }
 
   async function handleRun() {
-    if (!question.trim() || loading) return;
+    if (!question.trim() || loading || cooldown > 0) return;
 
     const currentQuestion = question;
 
@@ -155,10 +156,22 @@ export default function Home() {
     };
 
     const nextMessages = [...messages, userMessage];
+    const messagesForAI = nextMessages.slice(-6);
 
     setMessages(nextMessages);
     setQuestion("");
     setLoading(true);
+    setCooldown(5);
+
+    const timer = setInterval(() => {
+      setCooldown((prev) => {
+        if (prev <= 1) {
+          clearInterval(timer);
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
 
     const systemPrompt = `
 너는 학생이 직접 설계한 AI 역할을 수행한다.
@@ -195,26 +208,36 @@ ${mustDo || "질문에 맞게 정확히 답한다."}
 ${mustNot || "개인정보를 묻지 않는다."}
 `;
 
-    const res = await fetch("/api/chat", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        systemPrompt,
-        messages: nextMessages,
-      }),
-    });
+    try {
+      const res = await fetch("/api/chat", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          systemPrompt,
+          messages: messagesForAI,
+        }),
+      });
 
-    const data = await res.json();
+      const data = await res.json();
 
-    const aiMessage: ChatMessage = {
-      role: "ai",
-      text: data.text || data.error || "응답을 가져오지 못했어요.",
-    };
+      const aiMessage: ChatMessage = {
+        role: "ai",
+        text: data.text || data.error || "응답을 가져오지 못했어요.",
+      };
 
-    setMessages([...nextMessages, aiMessage]);
-    setLoading(false);
+      setMessages([...nextMessages, aiMessage]);
+    } catch {
+      const errorMessage: ChatMessage = {
+        role: "ai",
+        text: "연결이 잠시 불안정합니다. 잠깐 기다렸다가 다시 시도해주세요.",
+      };
+
+      setMessages([...nextMessages, errorMessage]);
+    } finally {
+      setLoading(false);
+    }
   }
 
   function resetChat() {
@@ -384,8 +407,12 @@ ${mustNot || "개인정보를 묻지 않는다."}
                 className="flex-1 rounded-xl border border-gray-300 px-4 py-3"
               />
 
-              <button onClick={handleRun} disabled={loading} className="rounded-xl bg-black px-5 py-3 font-bold text-white disabled:bg-gray-400">
-                보내기
+              <button
+                onClick={handleRun}
+                disabled={loading || cooldown > 0}
+                className="rounded-xl bg-black px-5 py-3 font-bold text-white disabled:bg-gray-400"
+              >
+                {loading ? "생각 중..." : cooldown > 0 ? `${cooldown}초` : "보내기"}
               </button>
             </div>
 
