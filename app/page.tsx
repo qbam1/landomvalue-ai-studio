@@ -26,6 +26,8 @@ type AISetting = {
   mustNot: string;
 };
 
+const QUESTION_LIMIT = 100;
+
 function encodeAISetting(setting: AISetting) {
   const json = JSON.stringify(setting);
   return encodeURIComponent(btoa(unescape(encodeURIComponent(json))));
@@ -58,16 +60,13 @@ export default function Home() {
 
   useEffect(() => {
     const saved = localStorage.getItem("landomvalue-ai-list");
-    if (saved) {
-      setSavedAIs(JSON.parse(saved));
-    }
+    if (saved) setSavedAIs(JSON.parse(saved));
 
     const params = new URLSearchParams(window.location.search);
     const sharedAI = params.get("ai");
 
     if (sharedAI) {
       const decoded = decodeAISetting(sharedAI);
-
       if (decoded) {
         setBotName(decoded.botName);
         setRole(decoded.role);
@@ -147,6 +146,11 @@ export default function Home() {
 
   async function handleRun() {
     if (!question.trim() || loading || cooldown > 0) return;
+
+    if (question.length > QUESTION_LIMIT) {
+      alert(`질문은 ${QUESTION_LIMIT}자 이하로 입력해주세요.`);
+      return;
+    }
 
     const currentQuestion = question;
 
@@ -399,6 +403,7 @@ ${mustNot || "개인정보를 묻지 않는다."}
             <div className="mt-4 flex gap-3">
               <input
                 value={question}
+                maxLength={QUESTION_LIMIT}
                 onChange={(e) => setQuestion(e.target.value)}
                 onKeyDown={(e) => {
                   if (e.key === "Enter") handleRun();
@@ -414,6 +419,13 @@ ${mustNot || "개인정보를 묻지 않는다."}
               >
                 {loading ? "생각 중..." : cooldown > 0 ? `${cooldown}초` : "보내기"}
               </button>
+            </div>
+
+            <div className="mt-2 flex justify-between text-xs text-gray-500">
+              <span>질문은 {QUESTION_LIMIT}자 이하로 입력합니다.</span>
+              <span>
+                {question.length} / {QUESTION_LIMIT}
+              </span>
             </div>
 
             <p className="mt-3 text-xs text-gray-500">
