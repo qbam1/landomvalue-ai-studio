@@ -55,6 +55,59 @@ export default function Home() {
   const activeRequestRef = useRef<AbortController | null>(null);
   const requestVersionRef = useRef(0);
   const [chatError, setChatError] = useState<{ text: string; question: string } | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const importInputRef = useRef<HTMLInputElement>(null);
+
+  function updateSetting(setValue: (value: string) => void, value: string) {
+    resetChat();
+    setShareLink("");
+    setValue(value);
+  }
+
+  function currentSetting(): AISetting {
+    return { botName, role, target, tone, mustDo, mustNot };
+  }
+
+  function applySetting(setting: AISetting, id: string | null = null) {
+    resetChat();
+    setQuestion("");
+    setShareLink("");
+    setEditingId(id);
+    setBotName(setting.botName);
+    setRole(setting.role);
+    setTarget(setting.target);
+    setTone(setting.tone);
+    setMustDo(setting.mustDo);
+    setMustNot(setting.mustNot);
+  }
+
+  function exportAI() {
+    if (!botName.trim() || !role.trim()) {
+      alert("AI 이름과 역할을 입력해주세요.");
+      return;
+    }
+    const data = { format: "landomvalue-ai", version: 1, setting: currentSetting() };
+    const url = URL.createObjectURL(new Blob([JSON.stringify(data, null, 2)], { type: "application/json" }));
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `${botName.replace(/[<>:"/\\|?*\x00-\x1f]/g, "_").slice(0, 60) || "my-ai"}.json`;
+    link.click();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  }
+
+  async function importAI(file: File) {
+    try {
+      if (file.size > 50000) throw new Error("File too large");
+      const data = JSON.parse(await file.text());
+      if (data?.format !== "landomvalue-ai" || data.version !== 1 || !isAISetting(data.setting)) {
+        throw new Error("Invalid AI file");
+      }
+      applySetting(data.setting);
+      alert("AI 파일을 불러왔습니다. 이 AI 저장하기를 누르면 이 기기에 보관됩니다.");
+    } catch {
+      alert("AI 파일을 읽지 못했습니다. 이 스튜디오에서 내보낸 JSON 파일을 선택해주세요.");
+    }
+  }
 
   useEffect(() => {
     const container = chatContainerRef.current;
@@ -119,18 +172,19 @@ export default function Home() {
     }
   }
 
-  function saveAI() {
+  function saveAI(asCopy = false) {
     if (!botName.trim() || !role.trim()) {
       alert("AI 이름과 역할을 입력해주세요.");
       return;
     }
-    if (savedAIs.length >= 5) {
+    const existing = asCopy ? undefined : savedAIs.find((ai) => ai.id === editingId);
+    if (!existing && savedAIs.length >= 5) {
       alert("저장한 AI는 최대 5개까지 가능합니다. 필요 없는 AI를 삭제한 뒤 다시 저장해주세요.");
       return;
     }
 
     const newAI: SavedAI = {
-      id: crypto.randomUUID(),
+      id: existing?.id ?? crypto.randomUUID(),
       botName: botName || "이름 없는 AI",
       role,
       target,
@@ -139,27 +193,22 @@ export default function Home() {
       mustNot,
     };
 
-    if (!saveToLocalStorage([newAI, ...savedAIs])) return;
+    const nextList = existing
+      ? savedAIs.map((ai) => ai.id === existing.id ? newAI : ai)
+      : [newAI, ...savedAIs];
+    if (!saveToLocalStorage(nextList)) return;
+    setEditingId(newAI.id);
     setShowSavedAIs(true);
     setShowGallery(true);
   }
 
   function loadAI(ai: SavedAI) {
-    resetChat();
-    followLatestRef.current = true;
-    setBotName(ai.botName);
-    setRole(ai.role);
-    setTarget(ai.target);
-    setTone(ai.tone);
-    setMustDo(ai.mustDo);
-    setMustNot(ai.mustNot);
-    setMessages([]);
-    setShareLink("");
+    applySetting(ai, ai.id);
   }
 
   function deleteAI(id: string) {
     const nextList = savedAIs.filter((ai) => ai.id !== id);
-    saveToLocalStorage(nextList);
+    if (saveToLocalStorage(nextList) && editingId === id) setEditingId(null);
   }
 
   async function createShareLink() {
@@ -314,16 +363,42 @@ ${mustNot || "개인정보를 묻지 않는다."}
             <h2 className="text-2xl font-bold">1. 나만의 AI 만들기</h2>
 
             <div className="mt-6 space-y-5">
-              <Input label="AI 이름" value={botName} setValue={setBotName} placeholder="예: 갯벌박사봇, 급식추천봇, 공룡선생님" />
-              <Input label="AI의 역할" value={role} setValue={setRole} placeholder="예: 너는 초등학생을 도와주는 환경 퀴즈 선생님이야." />
-              <Input label="사용 대상" value={target} setValue={setTarget} placeholder="예: 초등학교 5학년" />
-              <Input label="말투" value={tone} setValue={setTone} placeholder="예: 친절하고 재미있게, 어려운 말은 쉽게 풀어서" />
-              <TextArea label="반드시 해야 할 것" value={mustDo} setValue={setMustDo} placeholder="예: 답변 끝에 퀴즈 1개를 낸다." />
-              <TextArea label="하지 말아야 할 것" value={mustNot} setValue={setMustNot} placeholder="예: 개인정보를 묻지 않는다. 어려운 용어를 남발하지 않는다." />
+              <Input label="AI 이름" value={botName} setValue={(value) => updateSetting(setBotName, value)} placeholder="예: 갯벌박사봇, 급식추천봇, 공룡선생님" />
+              <Input label="AI의 역할" value={role} setValue={(value) => updateSetting(setRole, value)} placeholder="예: 너는 초등학생을 도와주는 환경 퀴즈 선생님이야." />
+              <Input label="사용 대상" value={target} setValue={(value) => updateSetting(setTarget, value)} placeholder="예: 초등학교 5학년" />
+              <Input label="말투" value={tone} setValue={(value) => updateSetting(setTone, value)} placeholder="예: 친절하고 재미있게, 어려운 말은 쉽게 풀어서" />
+              <TextArea label="반드시 해야 할 것" value={mustDo} setValue={(value) => updateSetting(setMustDo, value)} placeholder="예: 답변 끝에 퀴즈 1개를 낸다." />
+              <TextArea label="하지 말아야 할 것" value={mustNot} setValue={(value) => updateSetting(setMustNot, value)} placeholder="예: 개인정보를 묻지 않는다. 어려운 용어를 남발하지 않는다." />
 
-              <button onClick={saveAI} className="w-full rounded-2xl bg-black px-5 py-4 font-bold text-white">
-                이 AI 저장하기
+              <button onClick={() => saveAI()} className="w-full rounded-2xl bg-black px-5 py-4 font-bold text-white">
+                {editingId ? "수정한 AI 저장하기" : "이 AI 저장하기"}
               </button>
+
+              <div className="grid grid-cols-2 gap-3">
+                <button onClick={() => applySetting({ botName: "", role: "", target: "", tone: "", mustDo: "", mustNot: "" })} className="rounded-lg border px-3 py-3 font-bold">
+                  새 AI 만들기
+                </button>
+                <button onClick={() => saveAI(true)} disabled={!editingId} className="rounded-lg border px-3 py-3 font-bold disabled:opacity-40">
+                  복사본 저장
+                </button>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <button onClick={exportAI} className="rounded-lg border px-3 py-3 font-bold">AI 파일 내보내기</button>
+                <button onClick={() => importInputRef.current?.click()} className="rounded-lg border px-3 py-3 font-bold">AI 파일 가져오기</button>
+                <input
+                  ref={importInputRef}
+                  type="file"
+                  accept=".json,application/json"
+                  className="hidden"
+                  aria-label="AI 파일 선택"
+                  onChange={(event) => {
+                    const file = event.target.files?.[0];
+                    event.target.value = "";
+                    if (file) void importAI(file);
+                  }}
+                />
+              </div>
 
               <button onClick={createShareLink} className="w-full rounded-2xl bg-blue-600 px-5 py-4 font-bold text-white">
                 공유 링크 만들기
