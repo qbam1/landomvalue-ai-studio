@@ -10,8 +10,14 @@ type ChatMessage = {
 };
 
 export async function POST(req: Request) {
+  let body;
   try {
-    const { systemPrompt, messages } = await req.json();
+    body = await req.json();
+  } catch {
+    return Response.json({ error: "질문 형식이 올바르지 않습니다." }, { status: 400 });
+  }
+  try {
+    const { systemPrompt, messages } = body ?? {};
 
     if (!process.env.GEMINI_API_KEY) {
       return Response.json(
@@ -49,9 +55,10 @@ export async function POST(req: Request) {
       },
     }), (status, attempt) => console.warn("Gemini retry", { status, attempt }));
 
-    return Response.json({
-      text: response.text || "응답이 비어 있습니다.",
-    });
+    if (!response.text?.trim()) {
+      return Response.json({ error: "AI 답변이 비어 있어요. 다시 시도해주세요." }, { status: 502 });
+    }
+    return Response.json({ text: response.text });
   } catch (error: unknown) {
     const status = errorStatus(error);
     console.error("Gemini request failed", { status });
