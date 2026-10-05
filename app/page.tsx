@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 type ChatMessage = {
   role: "user" | "ai";
@@ -57,6 +57,15 @@ export default function Home() {
   const [shareLink, setShareLink] = useState("");
   const [loading, setLoading] = useState(false);
   const [cooldown, setCooldown] = useState(0);
+  const chatContainerRef = useRef<HTMLDivElement>(null);
+  const followLatestRef = useRef(true);
+
+  useEffect(() => {
+    const container = chatContainerRef.current;
+    if (container && followLatestRef.current) {
+      container.scrollTop = container.scrollHeight;
+    }
+  }, [messages, loading]);
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -120,6 +129,7 @@ export default function Home() {
   }
 
   function loadAI(ai: SavedAI) {
+    followLatestRef.current = true;
     setBotName(ai.botName);
     setRole(ai.role);
     setTarget(ai.target);
@@ -176,6 +186,7 @@ export default function Home() {
     const nextMessages = [...messages, userMessage];
     const messagesForAI = nextMessages.slice(-6);
 
+    followLatestRef.current = true;
     setMessages(nextMessages);
     setQuestion("");
     setLoading(true);
@@ -259,6 +270,7 @@ ${mustNot || "개인정보를 묻지 않는다."}
   }
 
   function resetChat() {
+    followLatestRef.current = true;
     setMessages([]);
   }
 
@@ -387,7 +399,17 @@ ${mustNot || "개인정보를 묻지 않는다."}
               </button>
             </div>
 
-            <div className="mt-6 h-[520px] overflow-y-auto rounded-2xl bg-gray-50 p-4">
+            <div
+              ref={chatContainerRef}
+              role="log"
+              aria-label="AI 대화"
+              onScroll={(event) => {
+                const container = event.currentTarget;
+                followLatestRef.current =
+                  container.scrollHeight - container.scrollTop - container.clientHeight < 80;
+              }}
+              className="mt-6 h-[520px] overflow-y-auto rounded-2xl bg-gray-50 p-4"
+            >
               {messages.length === 0 ? (
                 <p className="text-gray-500">아직 대화가 없습니다. 아래 질문을 입력해보세요.</p>
               ) : (
