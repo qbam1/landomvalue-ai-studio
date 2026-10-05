@@ -1,8 +1,8 @@
 import { GoogleGenAI } from "@google/genai";
 
-const ai = new GoogleGenAI({
-  apiKey: process.env.GEMINI_API_KEY!,
-});
+import { withRetry, errorStatus } from "../../../lib/gemini-retry";
+
+export const maxDuration = 60;
 
 type ChatMessage = {
   role: "user" | "ai";
@@ -20,7 +20,12 @@ export async function POST(req: Request) {
       );
     }
 
-    if (!messages || !Array.isArray(messages)) {
+    if (typeof systemPrompt !== "string" || systemPrompt.length > 8000 ||
+      !Array.isArray(messages) || messages.length === 0 || messages.length > 6 ||
+      !messages.every((msg: ChatMessage) => msg &&
+        (msg.role === "user" || msg.role === "ai") && typeof msg.text === "string" &&
+        msg.text.trim().length > 0 && msg.text.length <= (msg.role === "user" ? 100 : 8000)) ||
+      messages.at(-1).role !== "user") {
       return Response.json(
         { error: "messages 형식이 올바르지 않습니다." },
         { status: 400 }
@@ -32,23 +37,25 @@ export async function POST(req: Request) {
       parts: [{ text: msg.text }],
     }));
 
-    const response = await ai.models.generateContent({
+    const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+    const response = await withRetry(() => ai.models.generateContent({
       model: "gemini-2.5-flash-lite",
       contents,
       config: {
+        maxOutputTokens: 1024,
+        httpOptions: { timeout: 12000, retryOptions: { attempts: 1 } },
         systemInstruction:
           systemPrompt || "초등학생이 이해하기 쉽게 한국어로 답변하세요.",
       },
-    });
+    }), (status, attempt) => console.warn("Gemini retry", { status, attempt }));
 
     return Response.json({
       text: response.text || "응답이 비어 있습니다.",
     });
-  } catch (error: any) {
-    console.error("Gemini Error:", error);
-
-    const status = error?.status || error?.code;
-    const message = error?.message || String(error);
+  } catch (error: unknown) {
+    const status = errorStatus(error);
+    console.error("Gemini request failed", { status });
+    const message = error instanceof Error ? error.message : "";
 
     if (status === 429 || message.includes("429")) {
       return Response.json(
@@ -72,7 +79,7 @@ export async function POST(req: Request) {
 
     return Response.json(
       {
-        error: `Gemini 오류: ${message}`,
+        error: "AI 연결이 잠시 불안정해요. 잠시 후 다시 보내주세요.",
       },
       { status: 500 }
     );
