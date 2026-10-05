@@ -16,6 +16,7 @@ type SavedAI = {
   tone: string;
   mustDo: string;
   mustNot: string;
+  answerFormat?: string;
 };
 
 const QUESTION_LIMIT = 100;
@@ -57,6 +58,7 @@ export default function Home() {
   const [chatError, setChatError] = useState<{ text: string; question: string } | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const importInputRef = useRef<HTMLInputElement>(null);
+  const [answerFormat, setAnswerFormat] = useState("");
 
   function updateSetting(setValue: (value: string) => void, value: string) {
     resetChat();
@@ -65,7 +67,7 @@ export default function Home() {
   }
 
   function currentSetting(): AISetting {
-    return { botName, role, target, tone, mustDo, mustNot };
+    return { botName, role, target, tone, mustDo, mustNot, answerFormat };
   }
 
   function applySetting(setting: AISetting, id: string | null = null) {
@@ -79,6 +81,7 @@ export default function Home() {
     setTone(setting.tone);
     setMustDo(setting.mustDo);
     setMustNot(setting.mustNot);
+    setAnswerFormat(setting.answerFormat ?? "");
   }
 
   function exportAI() {
@@ -152,6 +155,7 @@ export default function Home() {
         setTone(decoded.tone);
         setMustDo(decoded.mustDo);
         setMustNot(decoded.mustNot);
+        setAnswerFormat(decoded.answerFormat ?? "");
         setMessages([]);
       } else {
         alert("공유 링크의 AI 설정이 올바르지 않습니다. 새 링크를 받아주세요.");
@@ -191,6 +195,7 @@ export default function Home() {
       tone,
       mustDo,
       mustNot,
+      answerFormat,
     };
 
     const nextList = existing
@@ -219,6 +224,7 @@ export default function Home() {
       tone,
       mustDo,
       mustNot,
+      answerFormat,
     };
 
     const encoded = encodeAISetting(setting);
@@ -282,7 +288,7 @@ export default function Home() {
 [AI 이름]
 ${botName || "이름 없는 AI"}
 
-[역할]
+[역할과 목표]
 ${role || "학생을 도와주는 AI"}
 
 [대상]
@@ -291,7 +297,10 @@ ${target || "초등학생"}
 [말투]
 ${tone || "친절하고 쉽게"}
 
-[반드시 해야 할 것]
+[답변 형식]
+${answerFormat || "대상에게 맞는 길이로 핵심을 명확하게 설명한다."}
+
+[행동 규칙]
 ${mustDo || "질문에 맞게 정확히 답한다."}
 
 [하지 말아야 할 것]
@@ -364,10 +373,11 @@ ${mustNot || "개인정보를 묻지 않는다."}
 
             <div className="mt-6 space-y-5">
               <Input label="AI 이름" value={botName} setValue={(value) => updateSetting(setBotName, value)} placeholder="예: 갯벌박사봇, 급식추천봇, 공룡선생님" />
-              <Input label="AI의 역할" value={role} setValue={(value) => updateSetting(setRole, value)} placeholder="예: 너는 초등학생을 도와주는 환경 퀴즈 선생님이야." />
+              <TextArea label="역할과 목표" value={role} setValue={(value) => updateSetting(setRole, value)} placeholder="예: 환경 선생님으로서 학생이 갯벌의 중요성을 이해하도록 도와줘." />
               <Input label="사용 대상" value={target} setValue={(value) => updateSetting(setTarget, value)} placeholder="예: 초등학교 5학년" />
               <Input label="말투" value={tone} setValue={(value) => updateSetting(setTone, value)} placeholder="예: 친절하고 재미있게, 어려운 말은 쉽게 풀어서" />
-              <TextArea label="반드시 해야 할 것" value={mustDo} setValue={(value) => updateSetting(setMustDo, value)} placeholder="예: 답변 끝에 퀴즈 1개를 낸다." />
+              <TextArea label="답변 형식" value={answerFormat} setValue={(value) => updateSetting(setAnswerFormat, value)} placeholder="예: 3문장 이내로 설명하고 예시를 하나 들어줘." />
+              <TextArea label="행동 규칙" value={mustDo} setValue={(value) => updateSetting(setMustDo, value)} placeholder="예: 정답을 바로 말하기 전에 힌트를 하나 줘." />
               <TextArea label="하지 말아야 할 것" value={mustNot} setValue={(value) => updateSetting(setMustNot, value)} placeholder="예: 개인정보를 묻지 않는다. 어려운 용어를 남발하지 않는다." />
 
               <button onClick={() => saveAI()} className="w-full rounded-2xl bg-black px-5 py-4 font-bold text-white">
