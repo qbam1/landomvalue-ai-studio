@@ -59,8 +59,16 @@ export default function Home() {
   const [cooldown, setCooldown] = useState(0);
 
   useEffect(() => {
+    const timer = setTimeout(() => {
     const saved = localStorage.getItem("landomvalue-ai-list");
-    if (saved) setSavedAIs(JSON.parse(saved));
+    if (saved) {
+      try {
+        const list = JSON.parse(saved);
+        if (Array.isArray(list)) setSavedAIs(list.slice(0, 5));
+      } catch {
+        console.warn("Saved AI data could not be read.");
+      }
+    }
 
     const params = new URLSearchParams(window.location.search);
     const sharedAI = params.get("ai");
@@ -77,6 +85,8 @@ export default function Home() {
         setMessages([]);
       }
     }
+    }, 0);
+    return () => clearTimeout(timer);
   }, []);
 
   function saveToLocalStorage(nextList: SavedAI[]) {
@@ -85,6 +95,10 @@ export default function Home() {
   }
 
   function saveAI() {
+    if (!botName.trim() || !role.trim()) {
+      alert("AI 이름과 역할을 입력해주세요.");
+      return;
+    }
     if (savedAIs.length >= 5) {
       alert("저장한 AI는 최대 5개까지 가능합니다. 필요 없는 AI를 삭제한 뒤 다시 저장해주세요.");
       return;
