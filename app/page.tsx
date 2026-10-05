@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { isAISetting, type AISetting } from "../lib/ai-settings";
 
 type ChatMessage = {
   role: "user" | "ai";
@@ -9,15 +10,6 @@ type ChatMessage = {
 
 type SavedAI = {
   id: string;
-  botName: string;
-  role: string;
-  target: string;
-  tone: string;
-  mustDo: string;
-  mustNot: string;
-};
-
-type AISetting = {
   botName: string;
   role: string;
   target: string;
@@ -36,7 +28,8 @@ function encodeAISetting(setting: AISetting) {
 function decodeAISetting(value: string): AISetting | null {
   try {
     const json = decodeURIComponent(escape(atob(decodeURIComponent(value))));
-    return JSON.parse(json);
+    const setting: unknown = JSON.parse(json);
+    return isAISetting(setting) ? setting : null;
   } catch {
     return null;
   }
@@ -59,25 +52,40 @@ export default function Home() {
   const [cooldown, setCooldown] = useState(0);
   const chatContainerRef = useRef<HTMLDivElement>(null);
   const followLatestRef = useRef(true);
+  const activeRequestRef = useRef<AbortController | null>(null);
+  const requestVersionRef = useRef(0);
+  const [chatError, setChatError] = useState<{ text: string; question: string } | null>(null);
 
   useEffect(() => {
     const container = chatContainerRef.current;
     if (container && followLatestRef.current) {
       container.scrollTop = container.scrollHeight;
     }
-  }, [messages, loading]);
+  }, [messages, loading, chatError]);
+
+  useEffect(() => () => activeRequestRef.current?.abort(), []);
+
+  useEffect(() => {
+    if (cooldown <= 0) return;
+    const timer = setTimeout(() => setCooldown(cooldown - 1), 1000);
+    return () => clearTimeout(timer);
+  }, [cooldown]);
 
   useEffect(() => {
     const timer = setTimeout(() => {
-    const saved = localStorage.getItem("landomvalue-ai-list");
-    if (saved) {
       try {
-        const list = JSON.parse(saved);
-        if (Array.isArray(list)) setSavedAIs(list.slice(0, 5));
+        const saved = localStorage.getItem("landomvalue-ai-list");
+        if (saved) {
+          const list: unknown = JSON.parse(saved);
+          if (Array.isArray(list)) {
+            setSavedAIs(list.filter((item): item is SavedAI =>
+              isAISetting(item) && "id" in item && typeof item.id === "string" && item.id.length > 0,
+            ).slice(0, 5));
+          }
+        }
       } catch {
         console.warn("Saved AI data could not be read.");
       }
-    }
 
     const params = new URLSearchParams(window.location.search);
     const sharedAI = params.get("ai");
@@ -92,6 +100,8 @@ export default function Home() {
         setMustDo(decoded.mustDo);
         setMustNot(decoded.mustNot);
         setMessages([]);
+      } else {
+        alert("공유 링크의 AI 설정이 올바르지 않습니다. 새 링크를 받아주세요.");
       }
     }
     }, 0);
@@ -99,8 +109,14 @@ export default function Home() {
   }, []);
 
   function saveToLocalStorage(nextList: SavedAI[]) {
-    setSavedAIs(nextList);
-    localStorage.setItem("landomvalue-ai-list", JSON.stringify(nextList));
+    try {
+      localStorage.setItem("landomvalue-ai-list", JSON.stringify(nextList));
+      setSavedAIs(nextList);
+      return true;
+    } catch {
+      alert("저장하지 못했습니다. 브라우저 저장 공간과 설정을 확인해주세요.");
+      return false;
+    }
   }
 
   function saveAI() {
@@ -123,12 +139,13 @@ export default function Home() {
       mustNot,
     };
 
-    saveToLocalStorage([newAI, ...savedAIs]);
+    if (!saveToLocalStorage([newAI, ...savedAIs])) return;
     setShowSavedAIs(true);
     setShowGallery(true);
   }
 
   function loadAI(ai: SavedAI) {
+    resetChat();
     followLatestRef.current = true;
     setBotName(ai.botName);
     setRole(ai.role);
@@ -168,39 +185,34 @@ export default function Home() {
     }
   }
 
-  async function handleRun() {
-    if (!question.trim() || loading || cooldown > 0) return;
+  async function handleRun(retryQuestion?: string) {
+    const currentQuestion = retryQuestion ?? question;
+    if (!currentQuestion.trim() || activeRequestRef.current || cooldown > 0) return;
 
-    if (question.length > QUESTION_LIMIT) {
+    if (currentQuestion.length > QUESTION_LIMIT) {
       alert(`질문은 ${QUESTION_LIMIT}자 이하로 입력해주세요.`);
       return;
     }
-
-    const currentQuestion = question;
 
     const userMessage: ChatMessage = {
       role: "user",
       text: currentQuestion,
     };
 
-    const nextMessages = [...messages, userMessage];
+    const history = chatError ? messages.slice(0, -1) : messages;
+    const nextMessages = [...history, userMessage];
     const messagesForAI = nextMessages.slice(-6);
+    const controller = new AbortController();
+    activeRequestRef.current = controller;
+    const version = ++requestVersionRef.current;
+    const timeout = setTimeout(() => controller.abort(), 55000);
 
     followLatestRef.current = true;
     setMessages(nextMessages);
-    setQuestion("");
+    if (!retryQuestion) setQuestion("");
+    setChatError(null);
     setLoading(true);
     setCooldown(5);
-
-    const timer = setInterval(() => {
-      setCooldown((prev) => {
-        if (prev <= 1) {
-          clearInterval(timer);
-          return 0;
-        }
-        return prev - 1;
-      });
-    }, 1000);
 
     const systemPrompt = `
 너는 학생이 직접 설계한 AI 역할을 수행한다.
@@ -239,6 +251,7 @@ ${mustNot || "개인정보를 묻지 않는다."}
 
     try {
       const res = await fetch("/api/chat", {
+        signal: controller.signal,
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -250,26 +263,38 @@ ${mustNot || "개인정보를 묻지 않는다."}
       });
 
       const data = await res.json();
+      if (version !== requestVersionRef.current) return;
+      if (!res.ok || typeof data.text !== "string" || !data.text.trim()) {
+        setChatError({ text: typeof data.error === "string" ? data.error : "응답을 가져오지 못했어요.", question: currentQuestion });
+        return;
+      }
 
       const aiMessage: ChatMessage = {
         role: "ai",
-        text: data.text || data.error || "응답을 가져오지 못했어요.",
+        text: data.text,
       };
 
       setMessages([...nextMessages, aiMessage]);
     } catch {
-      const errorMessage: ChatMessage = {
-        role: "ai",
-        text: "연결이 잠시 불안정합니다. 잠깐 기다렸다가 다시 시도해주세요.",
-      };
-
-      setMessages([...nextMessages, errorMessage]);
+      if (version !== requestVersionRef.current) return;
+      setChatError({ text: controller.signal.aborted
+        ? "답변을 기다리는 시간이 길어졌어요. 다시 시도해주세요."
+        : "연결이 잠시 불안정합니다. 잠깐 기다렸다가 다시 시도해주세요.", question: currentQuestion });
     } finally {
-      setLoading(false);
+      clearTimeout(timeout);
+      if (version === requestVersionRef.current) {
+        activeRequestRef.current = null;
+        setLoading(false);
+      }
     }
   }
 
   function resetChat() {
+    requestVersionRef.current++;
+    activeRequestRef.current?.abort();
+    activeRequestRef.current = null;
+    setLoading(false);
+    setChatError(null);
     followLatestRef.current = true;
     setMessages([]);
   }
@@ -434,6 +459,18 @@ ${mustNot || "개인정보를 묻지 않는다."}
                   )}
                 </div>
               )}
+              {chatError && (
+                <div role="alert" className="mt-4 rounded-lg border border-red-200 bg-red-50 p-4 text-red-900">
+                  <p>{chatError.text}</p>
+                  <button
+                    onClick={() => handleRun(chatError.question)}
+                    disabled={loading || cooldown > 0}
+                    className="mt-3 rounded-lg border border-red-300 px-3 py-2 text-sm font-bold disabled:opacity-50"
+                  >
+                    다시 시도
+                  </button>
+                </div>
+              )}
             </div>
 
             <div className="mt-4 flex gap-3">
@@ -442,14 +479,17 @@ ${mustNot || "개인정보를 묻지 않는다."}
                 maxLength={QUESTION_LIMIT}
                 onChange={(e) => setQuestion(e.target.value)}
                 onKeyDown={(e) => {
-                  if (e.key === "Enter") handleRun();
+                  if (e.key === "Enter" && !e.nativeEvent.isComposing && e.nativeEvent.keyCode !== 229) {
+                    e.preventDefault();
+                    handleRun();
+                  }
                 }}
                 placeholder="질문을 입력하세요. 예: 티라노사우루스는 왜 유명해?"
                 className="flex-1 rounded-xl border border-gray-300 px-4 py-3"
               />
 
               <button
-                onClick={handleRun}
+                onClick={() => handleRun()}
                 disabled={loading || cooldown > 0}
                 className="rounded-xl bg-black px-5 py-3 font-bold text-white disabled:bg-gray-400"
               >
@@ -490,6 +530,7 @@ function Input({
       <span className="mb-2 block font-bold">{label}</span>
       <input
         value={value}
+        maxLength={1000}
         onChange={(e) => setValue(e.target.value)}
         placeholder={placeholder}
         className="w-full rounded-xl border border-gray-300 px-4 py-3"
@@ -514,6 +555,7 @@ function TextArea({
       <span className="mb-2 block font-bold">{label}</span>
       <textarea
         value={value}
+        maxLength={1000}
         onChange={(e) => setValue(e.target.value)}
         placeholder={placeholder}
         rows={4}
