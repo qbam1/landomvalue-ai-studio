@@ -361,15 +361,11 @@ ${mustNot || "개인정보를 묻지 않는다."}
   }
 
   return (
-    <main className="min-h-screen bg-gray-100 px-6 py-10 text-gray-900">
+    <main id="studio-content" tabIndex={-1} className="chat-studio flex-1 bg-gray-100 px-6 py-10 text-gray-900">
       <div className="mx-auto max-w-6xl">
-        <header className="mb-8 rounded-3xl bg-white p-8 shadow">
-          <Link href="/" className="text-sm font-bold text-green-800">도구 모음으로 돌아가기 · 개발 미리보기</Link>
-          <h1 className="text-3xl font-bold">엉뚱한가치 AI Studio</h1>
-          <p className="mt-3 text-gray-600">
-            나만의 AI를 설계하고 직접 대화해보는 AI 실험 플랫폼입니다.
-          </p>
-        </header>
+        <div className="mb-8 border-b border-gray-300 pb-6">
+          <h1 className="text-3xl font-bold">챗봇 만들기</h1>
+        </div>
 
         <div className="grid gap-6 lg:grid-cols-2">
           <section className="rounded-3xl bg-white p-6 shadow">
@@ -659,4 +655,3 @@ function TextArea({
     </label>
   );
 }
-

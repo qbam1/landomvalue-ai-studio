@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
-import { ArrowRight, Bot, Boxes, Check, Download, FileText, FolderOpen, Image as ImageIcon,
+import { ArrowRight, Bot, Check, Download, FileText, FolderOpen, Image as ImageIcon,
   Link2, Mic, Pencil, Plus, Search, Trash2, Upload, X } from "lucide-react";
 import { TOOLS, isWorkspace, readWorkspace, safeWebLink, writeWorkspace,
   type RoomPlan, type Work, type Workspace } from "../lib/workspace";
@@ -90,23 +90,7 @@ export default function WorkspaceHome({ view }: { view: View }) {
   const titles = { tools: "AI 도구 모음", rooms: "수업 구성", works: "작품 보관함" };
 
   return <div className="hub">
-    <header className="hub-header">
-      <Link href="/" className="hub-brand"><Boxes size={25} strokeWidth={1.7} /><span>엉뚱한가치 <strong>AI Studio</strong></span></Link>
-      <span className="preview-label">개발 미리보기</span>
-      <nav aria-label="주요 메뉴">
-        {([['tools', '/', Boxes, '도구 모음'], ['rooms', '/rooms', FolderOpen, '수업 구성'], ['works', '/works', FileText, '작품 보관함']] as const).map(([id, href, Icon, label]) =>
-          <Link key={id} href={href} aria-current={view === id ? 'page' : undefined}><Icon size={17} />{label}</Link>)}
-      </nav>
-      <div className="backup-actions">
-        <button title="수업 구성·작품 백업" aria-label="수업 구성·작품 백업" disabled={!ready || storageError}
-          onClick={() => fileDownload('ai-studio-workspace.json', readWorkspace())}><Download size={18} /></button>
-        <button title="보관 파일 가져오기" aria-label="보관 파일 가져오기" onClick={() => importRef.current?.click()}><Upload size={18} /></button>
-        <input ref={importRef} type="file" accept=".json,application/json" hidden aria-label="보관 파일 선택"
-          onChange={event => { const file = event.target.files?.[0]; event.target.value = ''; if (file) void importBackup(file); }} />
-      </div>
-    </header>
-
-    <main className="hub-main">
+    <main className="hub-main" id="studio-content" tabIndex={-1}>
       <div className="page-heading"><div><div className="workspace-label">나의 스튜디오</div><h1>{titles[view]}</h1></div>
         <span className="local-label" title="수업 구성과 작품은 현재 브라우저에 보관됩니다.">이 브라우저에 보관</span>
         {view === 'rooms' && <button className="primary" disabled={!ready || storageError} onClick={() => { setEditingRoom(null); setRoomForm({ ...blankRoom }); }}><Plus size={17} />새 수업 구성</button>}
@@ -138,6 +122,15 @@ export default function WorkspaceHome({ view }: { view: View }) {
       </form>}
 
       <div className="list-toolbar"><label className="search"><Search size={17} /><input aria-label="검색" placeholder="검색" value={query} onChange={e => setQuery(e.target.value)} /></label>
+        <div className="backup-actions">
+          <button title="수업 구성·작품 백업" aria-label="수업 구성·작품 백업" disabled={!ready || storageError} onClick={() => {
+            try { fileDownload('ai-studio-workspace.json', readWorkspace()); }
+            catch { setNotice('백업을 만들지 못했습니다. 보관 데이터를 확인해주세요.'); }
+          }}><Download size={18} /></button>
+          <button title="보관 파일 가져오기" aria-label="보관 파일 가져오기" onClick={() => importRef.current?.click()}><Upload size={18} /></button>
+          <input ref={importRef} type="file" accept=".json,application/json" hidden aria-label="보관 파일 선택"
+            onChange={event => { const file = event.target.files?.[0]; event.target.value = ''; if (file) void importBackup(file); }} />
+        </div>
         {view === 'tools' && <div className="category-tabs" role="group" aria-label="도구 유형">{['전체', '대화', '이미지', '글', '음성'].map(item => <button key={item} aria-pressed={category === item} onClick={() => setCategory(item)}>{item}</button>)}</div>}
         {view !== 'tools' && <span className="result-count">{view === 'rooms' ? roomList.length : workList.length}개</span>}
       </div>
@@ -168,7 +161,6 @@ export default function WorkspaceHome({ view }: { view: View }) {
           <button title="작품 내보내기" aria-label={`${work.title} 내보내기`} onClick={() => fileDownload('ai-studio-work.json', work.kind === 'ai-setting' ? { format: 'landomvalue-ai', version: 1, setting: work.content } : work)}><Download size={17} /></button>
           <button title="작품 삭제" aria-label={`${work.title} 삭제`} onClick={() => { if (confirm('이 작품을 보관함에서 삭제할까요?')) commit(current => ({ ...current, works: current.works.filter(item => item.id !== work.id) })); }}><Trash2 size={17} /></button></div>
       </article>)}{!workList.length && <div className="empty-state"><FileText size={30} /><h2>{query ? '검색 결과가 없습니다.' : '보관한 작품이 없습니다.'}</h2>{!query && <Link href="/tools/chatbot">챗봇 만들기<ArrowRight size={17} /></Link>}</div>}</div>}
-      <footer className="hub-footer"><span>엉뚱한가치 AI Studio</span><span>개발 버전 · 온라인 수업 연결 전</span></footer>
     </main>
   </div>;
 }
